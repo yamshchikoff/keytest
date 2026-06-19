@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KeyTest — диагностика клавиатуры</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #08090c;
+  --surface: #111318;
+  --border: #1e2128;
+  --text: #9ca3af;
+  --text-dim: #4b5563;
+  --accent: #f59e0b;
+  --accent-glow: rgba(245, 158, 11, 0.3);
+  --green: #34d399;
+  --green-dim: #065f46;
+  --blue: #60a5fa;
+  --blue-dim: #1e3a5f;
+  --red: #f87171;
+  --red-dim: #7f1d1d;
+  --mod-bg: #1e293b;
+  --mod-active: #3b82f6;
+  --font: 'JetBrains Mono', monospace;
+  --scanline: rgba(255,255,255,0.012);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+/* Scanline overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    var(--scanline) 2px,
+    var(--scanline) 4px
+  );
+  pointer-events: none;
+  z-index: 100;
+}
+
+.app {
+  width: 100%;
+  max-width: 900px;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.header h1 {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.header-version {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+/* Counter */
+.counter-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.counter-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+}
+
+.counter-value {
+  font-size: 96px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+  text-shadow: 0 0 40px var(--accent-glow), 0 0 80px var(--accent-glow);
+  transition: transform 0.08s ease-out;
+  font-variant-numeric: tabular-nums;
+}
+
+.counter-value.pulse {
+  transform: scale(1.08);
+}
+
+/* Modifiers */
+.modifiers {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.mod-key {
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font);
+  letter-spacing: 0.05em;
+  background: var(--mod-bg);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  transition: all 0.12s ease;
+  text-transform: uppercase;
+}
+
+.mod-key.active {
+  color: #fff;
+  background: var(--mod-active);
+  border-color: var(--mod-active);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+}
+
+.mod-key.active[data-key="Shift"] {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+}
+
+.mod-key.active[data-key="Alt"] {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+}
+
+.mod-key.active[data-key="Meta"] {
+  background: #ec4899;
+  border-color: #ec4899;
+  box-shadow: 0 0 12px rgba(236, 72, 153, 0.4);
+}
+
+/* Token stream */
+.token-stream {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  min-height: 180px;
+  max-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  scroll-behavior: smooth;
+}
+
+.token-stream::-webkit-scrollbar {
+  width: 4px;
+}
+
+.token-stream::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.token-stream::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.token-stream:empty::after {
+  content: 'Нажмите любую клавишу...';
+  color: var(--text-dim);
+  font-size: 13px;
+  font-style: italic;
+  width: 100%;
+  text-align: center;
+  padding: 60px 0;
+}
+
+/* Token chips */
+.token {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: var(--font);
+  font-weight: 500;
+  white-space: nowrap;
+  animation: token-enter 0.2s ease-out;
+  border: 1px solid transparent;
+}
+
+.token .seq {
+  font-size: 9px;
+  opacity: 0.5;
+  font-weight: 400;
+}
+
+/* Key type tokens */
+.token.regular {
+  background: #1a1f2e;
+  color: #c9d1d9;
+  border-color: #2d3548;
+}
+
+.token.special {
+  background: var(--green-dim);
+  color: var(--green);
+  border-color: #065f46;
+}
+
+.token.modifier-tok {
+  background: var(--blue-dim);
+  color: var(--blue);
+  border-color: #1e3a5f;
+}
+
+@keyframes token-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Bottom bar */
+.bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.last-key-time {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font);
+}
+
+.btn-clear {
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 8px 20px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.btn-clear:hover {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--red-dim);
+}
+
+/* Confirm dialog overlay */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fade-in 0.15s ease;
+}
+
+.confirm-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 360px;
+  text-align: center;
+  font-family: var(--font);
+}
+
+.confirm-dialog p {
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 20px;
+}
+
+.confirm-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.confirm-buttons button {
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 8px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: all 0.12s ease;
+}
+
+.confirm-yes {
+  background: var(--red-dim);
+  border: 1px solid var(--red);
+  color: var(--red);
+}
+
+.confirm-yes:hover {
+  background: var(--red);
+  color: #fff;
+}
+
+.confirm-no {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.confirm-no:hover {
+  color: #fff;
+  border-color: #555;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-dot"></div>
+    <h1>KeyTest</h1>
+    <span class="header-version">v1.0</span>
+  </header>
+
+  <!-- Counter -->
+  <section class="counter-section">
+    <span class="counter-label">Нажатий</span>
+    <span class="counter-value" id="counter">0</span>
+  </section>
+
+  <!-- Modifiers -->
+  <section class="modifiers" id="modifiers">
+    <span class="mod-key" data-key="Control">Ctrl</span>
+    <span class="mod-key" data-key="Alt">Alt</span>
+    <span class="mod-key" data-key="Shift">Shift</span>
+    <span class="mod-key" data-key="Meta">Meta</span>
+  </section>
+
+  <!-- Token stream -->
+  <section class="token-stream" id="stream"></section>
+
+  <!-- Bottom bar -->
+  <footer class="bottom-bar">
+    <span class="last-key-time" id="lastTime">Ожидание...</span>
+    <button class="btn-clear" id="btnClear">Очистить</button>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const counterEl = document.getElementById('counter');
+  const streamEl = document.getElementById('stream');
+  const lastTimeEl = document.getElementById('lastTime');
+  const btnClear = document.getElementById('btnClear');
+  const modKeys = document.querySelectorAll('.mod-key');
+
+  let count = 0;
+  let tokens = [];
+  const MAX_TOKENS = 500;
+  const PRUNE_COUNT = 100;
+  let pulseTimer = null;
+
+  const KEY_NAMES = {
+    ' ': 'Space',
+    'ArrowUp': '↑',
+    'ArrowDown': '↓',
+    'ArrowLeft': '←',
+    'ArrowRight': '→',
+    'Escape': 'Esc',
+    'Backspace': '⌫',
+    'Delete': '⌦',
+    'Enter': '↵',
+    'CapsLock': 'Caps',
+    'PageUp': 'PgUp',
+    'PageDown': 'PgDn',
+    'Insert': 'Ins',
+    'Home': 'Home',
+    'End': 'End',
+    'NumLock': 'NumLk',
+    'ScrollLock': 'ScrLk',
+    'PrintScreen': 'PrtSc',
+    'Pause': 'Pause',
+    'ContextMenu': 'Menu',
+  };
+
+  const MODIFIERS = new Set(['Control', 'Alt', 'Shift', 'Meta']);
+  const SPECIALS = new Set([
+    'Enter', 'Backspace', 'Delete', 'Escape', 'Tab', 'CapsLock',
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+    'Home', 'End', 'PageUp', 'PageDown', 'Insert',
+    'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
+    'NumLock', 'ScrollLock', 'PrintScreen', 'Pause', 'ContextMenu',
+  ]);
+
+  function keyName(e) {
+    const raw = e.key;
+    if (KEY_NAMES[raw]) return KEY_NAMES[raw];
+    if (/^F\d{1,2}$/.test(raw)) return raw;
+    return raw.length === 1 ? raw : raw;
+  }
+
+  function keyCategory(e) {
+    if (MODIFIERS.has(e.key)) return 'modifier-tok';
+    if (SPECIALS.has(e.key)) return 'special';
+    if (/^F\d{1,2}$/.test(e.key)) return 'special';
+    return 'regular';
+  }
+
+  function formatTime() {
+    const now = new Date();
+    return now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function pulseCounter() {
+    if (pulseTimer) clearTimeout(pulseTimer);
+    counterEl.classList.add('pulse');
+    pulseTimer = setTimeout(() => counterEl.classList.remove('pulse'), 80);
+  }
+
+  function addToken(e) {
+    const name = keyName(e);
+    const cat = keyCategory(e);
+
+    const token = document.createElement('span');
+    token.className = `token ${cat}`;
+
+    const seq = document.createElement('span');
+    seq.className = 'seq';
+    seq.textContent = `#${count + 1}`;
+
+    token.appendChild(seq);
+    token.appendChild(document.createTextNode(` ${name}`));
+
+    // Prune old tokens
+    while (tokens.length >= MAX_TOKENS) {
+      const old = tokens.shift();
+      old.remove();
+    }
+    while (tokens.length > MAX_TOKENS - PRUNE_COUNT) {
+      const old = tokens.shift();
+      old.remove();
+    }
+
+    tokens.push(token);
+    streamEl.appendChild(token);
+    streamEl.scrollTop = streamEl.scrollHeight;
+  }
+
+  function updateModifiers(e) {
+    modKeys.forEach(el => {
+      const mod = el.dataset.key;
+      if (e.getModifierState(mod)) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    });
+  }
+
+  function onKeyDown(e) {
+    // Prevent browser shortcuts for keys we want to capture
+    const preventKeys = [
+      'F5', 'F11', 'F12',
+    ];
+    const preventCombos = [
+      { key: 's', ctrl: true },
+      { key: 'p', ctrl: true },
+      { key: 't', ctrl: true },
+      { key: 'n', ctrl: true },
+      { key: 'w', ctrl: true },
+      { key: 'Tab', alt: true },
+    ];
+
+    if (preventKeys.includes(e.key)) {
+      e.preventDefault();
+    }
+    for (const combo of preventCombos) {
+      if (e.key === combo.key && e.ctrlKey === !!combo.ctrl && e.altKey === !!combo.alt && !combo.meta) {
+        e.preventDefault();
+      }
+    }
+
+    updateModifiers(e);
+
+    count++;
+    counterEl.textContent = count;
+    pulseCounter();
+
+    addToken(e);
+
+    lastTimeEl.textContent = formatTime();
+  }
+
+  function onKeyUp(e) {
+    updateModifiers(e);
+  }
+
+  function clearAll() {
+    count = 0;
+    counterEl.textContent = '0';
+    tokens.forEach(t => t.remove());
+    tokens = [];
+    lastTimeEl.textContent = 'Ожидание...';
+
+    modKeys.forEach(el => el.classList.remove('active'));
+  }
+
+  function showConfirm() {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'confirm-dialog';
+
+    const msg = document.createElement('p');
+    msg.textContent = 'Очистить историю и сбросить счётчик?';
+
+    const btns = document.createElement('div');
+    btns.className = 'confirm-buttons';
+
+    const yesBtn = document.createElement('button');
+    yesBtn.className = 'confirm-yes';
+    yesBtn.textContent = 'Да';
+
+    const noBtn = document.createElement('button');
+    noBtn.className = 'confirm-no';
+    noBtn.textContent = 'Нет';
+
+    yesBtn.addEventListener('click', () => {
+      clearAll();
+      overlay.remove();
+    });
+
+    noBtn.addEventListener('click', () => {
+      overlay.remove();
+    });
+
+    overlay.addEventListener('click', (ev) => {
+      if (ev.target === overlay) overlay.remove();
+    });
+
+    btns.appendChild(yesBtn);
+    btns.appendChild(noBtn);
+    dialog.appendChild(msg);
+    dialog.appendChild(btns);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // Focus trap
+    noBtn.focus();
+  }
+
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup', onKeyUp);
+  btnClear.addEventListener('click', showConfirm);
+})();
+</script>
+</body>
+</html>
