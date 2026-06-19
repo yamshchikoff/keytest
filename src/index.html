@@ -482,7 +482,7 @@ body::after {
       e.preventDefault();
     }
     for (const combo of preventCombos) {
-      if (e.key === combo.key && e.ctrlKey === !!combo.ctrl && e.altKey === !!combo.alt && !combo.meta) {
+      if (e.key === combo.key && e.ctrlKey === !!combo.ctrl && e.altKey === !!combo.alt) {
         e.preventDefault();
       }
     }
