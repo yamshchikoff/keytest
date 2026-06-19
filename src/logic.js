@@ -23,7 +23,7 @@ const KEY_NAMES = {
   'ContextMenu': 'Menu',
 };
 
-const MODIFIERS = new Set(['Control', 'Alt', 'Shift', 'Meta']);
+const MODIFIERS = new Set(['Control', 'Alt', 'AltGraph', 'Shift', 'Meta']);
 
 const SPECIALS = new Set([
   'Enter', 'Backspace', 'Delete', 'Escape', 'Tab', 'CapsLock',
@@ -36,7 +36,7 @@ const SPECIALS = new Set([
 function keyName(eventKey) {
   if (KEY_NAMES[eventKey]) return KEY_NAMES[eventKey];
   if (/^F\d{1,2}$/.test(eventKey)) return eventKey;
-  return eventKey.length === 1 ? eventKey : eventKey;
+  return eventKey;
 }
 
 function keyCategory(eventKey) {
@@ -47,14 +47,14 @@ function keyCategory(eventKey) {
 }
 
 function pruneTokens(tokens, maxTokens, pruneCount) {
-  while (tokens.length >= maxTokens) {
-    tokens.shift();
-    pruneCount--;
+  const removed = [];
+  if (tokens.length >= maxTokens) {
+    const target = maxTokens - pruneCount;
+    while (tokens.length > target) {
+      removed.push(tokens.shift());
+    }
   }
-  while (tokens.length > maxTokens - pruneCount) {
-    tokens.shift();
-  }
-  return tokens;
+  return removed;
 }
 
 if (typeof module !== 'undefined' && module.exports) {

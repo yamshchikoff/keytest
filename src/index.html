@@ -406,6 +406,7 @@ body::after {
   </footer>
 </div>
 
+<script src="logic.js"></script>
 <script>
 (() => {
   const counterEl = document.getElementById('counter');
@@ -420,52 +421,6 @@ body::after {
   const PRUNE_COUNT = 100;
   let pulseTimer = null;
 
-  const KEY_NAMES = {
-    ' ': 'Space',
-    'ArrowUp': '↑',
-    'ArrowDown': '↓',
-    'ArrowLeft': '←',
-    'ArrowRight': '→',
-    'Escape': 'Esc',
-    'Backspace': '⌫',
-    'Delete': '⌦',
-    'Enter': '↵',
-    'CapsLock': 'Caps',
-    'PageUp': 'PgUp',
-    'PageDown': 'PgDn',
-    'Insert': 'Ins',
-    'Home': 'Home',
-    'End': 'End',
-    'NumLock': 'NumLk',
-    'ScrollLock': 'ScrLk',
-    'PrintScreen': 'PrtSc',
-    'Pause': 'Pause',
-    'ContextMenu': 'Menu',
-  };
-
-  const MODIFIERS = new Set(['Control', 'Alt', 'Shift', 'Meta']);
-  const SPECIALS = new Set([
-    'Enter', 'Backspace', 'Delete', 'Escape', 'Tab', 'CapsLock',
-    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-    'Home', 'End', 'PageUp', 'PageDown', 'Insert',
-    'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
-    'NumLock', 'ScrollLock', 'PrintScreen', 'Pause', 'ContextMenu',
-  ]);
-
-  function keyName(e) {
-    const raw = e.key;
-    if (KEY_NAMES[raw]) return KEY_NAMES[raw];
-    if (/^F\d{1,2}$/.test(raw)) return raw;
-    return raw.length === 1 ? raw : raw;
-  }
-
-  function keyCategory(e) {
-    if (MODIFIERS.has(e.key)) return 'modifier-tok';
-    if (SPECIALS.has(e.key)) return 'special';
-    if (/^F\d{1,2}$/.test(e.key)) return 'special';
-    return 'regular';
-  }
-
   function formatTime() {
     const now = new Date();
     return now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -478,8 +433,8 @@ body::after {
   }
 
   function addToken(e) {
-    const name = keyName(e);
-    const cat = keyCategory(e);
+    const name = keyName(e.key);
+    const cat = keyCategory(e.key);
 
     const token = document.createElement('span');
     token.className = `token ${cat}`;
@@ -491,15 +446,7 @@ body::after {
     token.appendChild(seq);
     token.appendChild(document.createTextNode(` ${name}`));
 
-    // Prune old tokens
-    while (tokens.length >= MAX_TOKENS) {
-      const old = tokens.shift();
-      old.remove();
-    }
-    while (tokens.length > MAX_TOKENS - PRUNE_COUNT) {
-      const old = tokens.shift();
-      old.remove();
-    }
+    pruneTokens(tokens, MAX_TOKENS, PRUNE_COUNT).forEach(t => t.remove());
 
     tokens.push(token);
     streamEl.appendChild(token);
@@ -520,7 +467,7 @@ body::after {
   function onKeyDown(e) {
     // Prevent browser shortcuts for keys we want to capture
     const preventKeys = [
-      'F5', 'F11', 'F12',
+      'F5', 'F11', 'F12', 'Tab',
     ];
     const preventCombos = [
       { key: 's', ctrl: true },
