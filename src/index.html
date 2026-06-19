@@ -446,7 +446,9 @@ body::after {
     token.appendChild(seq);
     token.appendChild(document.createTextNode(` ${name}`));
 
-    pruneTokens(tokens, MAX_TOKENS, PRUNE_COUNT).forEach(t => t.remove());
+    if (tokens.length >= MAX_TOKENS) {
+      pruneTokens(tokens, MAX_TOKENS, PRUNE_COUNT).forEach(t => t.remove());
+    }
 
     tokens.push(token);
     streamEl.appendChild(token);
@@ -475,7 +477,6 @@ body::after {
       { key: 't', ctrl: true },
       { key: 'n', ctrl: true },
       { key: 'w', ctrl: true },
-      { key: 'Tab', alt: true },
     ];
 
     if (preventKeys.includes(e.key)) {
